@@ -79,14 +79,115 @@ For those using a rpc-node as the data source, a WIF of this transaction id shou
 `addr = 'PHUAHFBhFRypCbnTiXgGHiYyrftzkvDxVE'`
 
 The reason for taking the DeckSpawn transaction id as a publicly known privatekey is to allow anyone to import the key into their node in order to track this deck.
-The mechanism that makes this useful is the fact that every valid PeerAssets transaction for that deck pay a fee to the P2TH address, in this instance `PHUAHFBhFRypCbnTiXgGHiYyrftzkvDxVE`. Since this address is included in every valid PeerAssets transaction then importing the wif belonging to this address will scan the
+The mechanism that makes this useful is the fact that every valid PeerAssets transaction for that deck pays a fee to the P2TH address, in this instance `PHUAHFBhFRypCbnTiXgGHiYyrftzkvDxVE`. Since this address is included in every valid PeerAssets transaction then importing the wif belonging to this address will scan the
 blockchain and download all relevant transactions. Another reason for creating this deterministic address for tagging transactions is that any standard blockexplorer can be used to find relevant PeerAssets transactions. Simply list all transaction for the given P2TH address. 
 
 
 
 ## Transaction Structure
 
+For a CardTransfer transaction consider the following ,
 
+- Use of `vout[0]` is strictly for tagging the P2TH Address  
+- Use of `vout[1]` is strictly for OP_RETURN data  
+- 0 Value use of a `vout[n] where n > 1` is to designate the receiver referenced in the amount fields of OP_RETURN data.  
+
+
+> Example of what's inside OP_RETURN
+
+```python
+import pypeerassets as pa
+from binascii import unhexlify
+
+op_return = unhexlify('080112178c89f806cba48c03c0921785a1a602a0f8eb02b2ceea011802')
+Card = pa.paproto_pb2.CardTransfer()
+Card.ParseFromString(op_return)
+Card
+```
+
+Lets' take a look at the OP_RETURN data in vout[1].  
+`080112178c89f806cba48c03c0921785a1a602a0f8eb02b2ceea011802`  
+
+
+> Parsed from string using the CardTransfer object in pypeerassets.
+
+```
+version: 1  
+amount: 14550156  
+amount: 6492747  
+amount: 379200  
+amount: 4821125  
+amount: 5962784  
+amount: 3843890  
+number_of_decimals: 2
+```
+
+The first instance of `amount` in the parsed data will represent the amount being transfered from the sender to the receiver designated in the addresses field of vout[2].
+The second instance of `amount` in the parsed data will represent the amount being transfered to the receiver defined in the addresses field of vout[3] and so
+on. For this example this means that there should be a total of 8 vout's ( though the number has been reduced in the printed example to save space).  
+  
+- vout[0] : Pays Fee to P2TH Address
+- vout[1] : 0 Value OP_RETURN Containing Serialized Card Data
+- vout[n..] : 0 Value pubkeyhash sent to receiving address that corresponds to amount[n] located in Serialized Card Data
+
+
+
+> Example of a Card Transaction's vout:
+
+```json
+{
+"vout" : [
+        {
+            "value" : 0.01000000,
+            "n" : 0,
+            "scriptPubKey" : {
+                "asm" : "OP_DUP OP_HASH160 f2c67a919521a0031493bcd73687567ddee3f072 OP_EQUALVERIFY OP_CHECKSIG",
+                "hex" : "76a914f2c67a919521a0031493bcd73687567ddee3f07288ac",
+                "reqSigs" : 1,
+                "type" : "pubkeyhash",
+                "addresses" : [
+                    "< P2TH Address >"
+                ]
+            }
+        },
+        {
+            "value" : 0.00000000,
+            "n" : 1,
+            "scriptPubKey" : {
+                "asm" : "OP_RETURN 080112178c89f806cba48c03c0921785a1a602a0f8eb02b2ceea011802",
+                "hex" : "6a1d080112178c89f806cba48c03c0921785a1a602a0f8eb02b2ceea011802",
+                "type" : "nulldata"
+            }
+        },
+        {
+            "value" : 0.00000000,
+            "n" : 2,
+            "scriptPubKey" : {
+                "asm" : "OP_DUP OP_HASH160 33f9ce209f35cb842395b025b22fec0596933ac1 OP_EQUALVERIFY OP_CHECKSIG",
+                "hex" : "76a91433f9ce209f35cb842395b025b22fec0596933ac188ac",
+                "reqSigs" : 1,
+                "type" : "pubkeyhash",
+                "addresses" : [
+                    "< Receiving Address 1 >"
+                ]
+            }
+        },
+        {
+            "value" : 0.00000000,
+            "n" : 3,
+            "scriptPubKey" : {
+                "asm" : "OP_DUP OP_HASH160 1325dfefd4ef7b38fdd3e0c1b6941502b7891889 OP_EQUALVERIFY OP_CHECKSIG",
+                "hex" : "76a9141325dfefd4ef7b38fdd3e0c1b6941502b789188988ac",
+                "reqSigs" : 1,
+                "type" : "pubkeyhash",
+                "addresses" : [
+                    "< Receiving Address 2 ... >"
+                ]
+            }
+        }
+    ]
+}
+```
 
 ## Decks 
 On the right you can see an example of what a PeerAssets Deck Object looks like. It contains the fields version, name, number_of_decimals, issue_mode, asset_specific_data, and fee.
