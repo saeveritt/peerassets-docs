@@ -2,14 +2,11 @@
 title: API Reference
 
 language_tabs: # must be one of https://git.io/vQNgJ
-  - shell
-  - ruby
   - python
-  - javascript
+  - shell
 
 toc_footers:
-  - <a href='#'>Sign Up for a Developer Key</a>
-  - <a href='https://github.com/lord/slate'>Documentation Powered by Slate</a>
+  - <a href='#'>Donate to PeerAssets.org</a>
 
 includes:
   - errors
@@ -19,202 +16,263 @@ search: true
 
 # Introduction
 
-Welcome to the Kittn API! You can use our API to access Kittn API endpoints, which can get information on various cats, kittens, and breeds in our database.
+Welcome to PeerAssets, a blockchain agnostic protocol which enables peers to issue, transact, burn, and vote with assets! You can use our API, papi.peercoin.net, or host your own! These allow you to access PeerAssets API endpoints, which contains information pertaining to PeerAssets Decks, Cards, and Votes. PeerAssets is inspired by the original idea of "Colored Coins" and uses OP_RETURN to write data on the blockchain, but offers some optimizations to reduce the amount of data written in OP_RETURN. PeerAssets enables easy querying of the blockchain for relevant transactions and offers some extra features like shareholder voting, dividends payouts, and more! To read more about PeerAssets and its functionality check out the [Whitepaper](https://peerassets.github.io/WhitePaper/)!
 
-We have language bindings in Shell, Ruby, and Python! You can view code examples in the dark area to the right, and you can switch the programming language of the examples with the tabs in the top right.
 
-This example API documentation page was created with [Slate](https://github.com/lord/slate). Feel free to edit it and use it as a base for your own API's documentation.
+You can view code examples in the dark area to the right, and you can switch the programming language of the examples with the tabs in the top right.
 
-# Authentication
+# Protocol
 
-> To authorize, use this code:
 
-```ruby
-require 'kittn'
+## Protocol Buffer
+PeerAssets utilizes a protocol buffer that is language-neutral, platform-neutral, and acts as an extensible mechanism for serializing structured data.
+This project currently uses Google's [proto3](https://developers.google.com/protocol-buffers/docs/proto3) language. With proto3, versions of the PeerAssets protocol can be readily
+created to work with Go, Ruby, Python, Objective-C, C++, and C# implementations.
 
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-```
+The `.proto` file can be located [here](https://github.com/PeerAssets/peerassets-rfcs/blob/master/0001-peerassets-transaction-specification.proto).
 
 ```python
-import kittn
+from pypeerassets.paproto_pb2 import DeckSpawn
 
-api = kittn.authorize('meowmeowmeow')
+Deck = DeckSpawn()
+Deck.version = 1
+Deck.name = 'My Deck'
+Deck.number_of_decimals = 8
+Deck.issue_mode = 0x04
+Deck.asset_specific_data = 'Hello World'
+Deck.SerializeToString()
+```
+**Example of a serialized Deck Object:**  
+  (28 bytes)  
+  `b'\x08\x01\x12\x07My Deck\x18\x08 \x04*\x0bHello World'`
+
+This data is embedded into OP_RETURN and only takes up 28 bytes. 
+
+**Example not using the protocol buffer**  
+(101 bytes)  
+`b'version: 1, name: "My Deck", number_of_decimals: 8, issue_mode: 4, asset_specific_data: "Hello World"'`
+
+This optimization allows PeerAssets to be a compact protocol with many advantages over current colored coin implementations. Without using proto3 we would have to store approximately 100 bytes of data.
+
+
+## Pay-to-TagHash
+Querying for non-indexed data on the blockchain can be considered inefficient and should be avoided. Pay-to-TagHash, denoted P2TH, is the methodology in which all PeerAssets transactions are indexed. This allows thin clients to find PeerAssets related transactions rapidly using standard functions exposed by widely available blockchain explorers and rpc-nodes. You can read about the full mechanism by checking out the [Whitepaper](https://peerassets.github.io/P2TH/).
+
+**Example:**  
+Say an issuer with the address `n1ga7fPBerBZDK9NPru39Fanzj9cPhbumM` creates a DeckSpawn transaction and submits it to the network. This transaction will have a 256 bit transaction id. In this case the id for this issuer's transaction is `17d24b9bca5a090a24af138c2e085f80621396e8c7b6f820dee7140aee15cac1`. We can take advantage of this unique transaction id in a few way. We want to look at this 256 bit value as a publicly known privatekey. Although this may seem counterintuative it allows us to do a few things.
+
+> Generate WIF and Obtain P2TH Address
+
+```python
+import pypeerassets as pa
+from binascii import unhexlify
+
+privkey = unhexlify('7d24b9bca5a090a24af138c2e085f80621396e8c7b6f820dee7140aee15cac1')
+KeyObject = pa.Kutil(privkey=privkey, network='tppc')
+wif = KeyObject.wif
+addr = KeyObject.address
 ```
 
-```shell
-# With shell, you can just pass the correct header with each request
-curl "api_endpoint_here"
-  -H "Authorization: meowmeowmeow"
+For those using a rpc-node as the data source, a WIF of this transaction id should be generated so that you may import it into your local node. Second, we will obtain the address, denoted the P2TH address, associated with this publicly known private key. Note that this is not the same address as the issuer's address.  
+
+`wif  = 'U5uhNJbLp22qRARNNJ954NTDzV3HUXMqQmKETtis95P9GtiqddKN'`  
+`addr = 'PHUAHFBhFRypCbnTiXgGHiYyrftzkvDxVE'`
+
+The reason for taking the DeckSpawn transaction id as a publicly known privatekey is to allow anyone to import the key into their node in order to track this deck.
+The mechanism that makes this useful is the fact that every valid PeerAssets transaction for that deck pay a fee to the P2TH address, in this instance `PHUAHFBhFRypCbnTiXgGHiYyrftzkvDxVE`. Since this address is included in every valid PeerAssets transaction then importing the wif belonging to this address will scan the
+blockchain and download all relevant transactions. Another reason for creating this deterministic address for tagging transactions is that any standard blockexplorer can be used to find relevant PeerAssets transactions. Simply list all transaction for the given P2TH address. 
+
+
+
+## Transaction Structure
+
+
+
+## Decks 
+On the right you can see an example of what a PeerAssets Deck Object looks like. It contains the fields version, name, number_of_decimals, issue_mode, asset_specific_data, and fee.
+
+> An example of a PeerAssets Deck Object,
+
 ```
-
-```javascript
-const kittn = require('kittn');
-
-let api = kittn.authorize('meowmeowmeow');
+{
+    "version" : 1,
+    "name" : "My Deck",
+    "number_of_decimals": 8,
+    "issue_mode": 0x04,
+    "asset_specific_data": "",
+    "fee": 0
+  }
 ```
+### Version
+The `version` field represents the PeerAssets protocol version number used to define this deck.
 
-> Make sure to replace `meowmeowmeow` with your API key.
+### Name
+The `name` field defines the name which will be assigned to the Deck.
 
-Kittn uses API keys to allow access to the API. You can register a new Kittn API key at our [developer portal](http://example.com/developers).
+### Number of Decimals
+The `number_of_decimals` field defines the precision level of a Deck. It represents the number of decimals in which an 
+asset can be divided into. For example, Bitcoin uses 8. 
 
-Kittn expects for the API key to be included in all API requests to the server in a header that looks like the following:
+### Issue Modes
+- `NONE   = 0x00;`  
+  - No issuance allowed  
+- `CUSTOM = 0x01;`  
+  - Not specified, custom client implementation needed  
+- `ONCE   = 0x02;`  
+  - Only one issuance transaction from asset owner allowed  
+- `MULTI  = 0x04;`  
+  - Multiple issuance transactions from asset owner allowed  
+- `MONO   = 0x08;`  
+  - All card transaction amounts are equal to 1  
+- `UNFLUSHABLE  = 0x10;`  
+  - No card transfer transactions allowed except for the card-issue transaction 0x20 used by SUBSCRIPTION (0x34 = 0x20 | 0x04 | 0x10)  
+- `SUBSCRIPTION = 0x34;`  
+  - An address is subscribed to a service for X hours since the first received cards. 
+Where X is the asset balance of the address. This mode automatically enables MULTI & UNFLUSHABLE (0x34 = 0x20 | 0x04 | 0x10)  
+- `SINGLET = 0x0a;`  
+  - SINGLET is a combination of ONCE and MONO (0x02 | 0x08). Singlet deck, one MONO card issunce allowed. (ONCE | MONO)  
 
-`Authorization: meowmeowmeow`
+### Asset Specific Data
+
+### Fee
+
+
+## Cards
+
+# Papi
 
 <aside class="notice">
-You must replace <code>meowmeowmeow</code> with your personal API key.
+You must have the Docker service running and Docker-Compose installed.
 </aside>
 
-# Kittens
-
-## Get All Kittens
-
-```ruby
-require 'kittn'
-
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-api.kittens.get
-```
-
-```python
-import kittn
-
-api = kittn.authorize('meowmeowmeow')
-api.kittens.get()
-```
+> Install Docker-CE
 
 ```shell
-curl "http://example.com/api/kittens"
-  -H "Authorization: meowmeowmeow"
+$ sudo apt-get update
+$ sudo apt-get install apt-transport-https ca-certificates curl software-properties-common
+$ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+$ sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu (lsb_release -cs) stable"
+$ sudo apt-get update
+$ sudo apt-get install docker-ce
 ```
 
-```javascript
-const kittn = require('kittn');
+> Install Docker-Compose
 
-let api = kittn.authorize('meowmeowmeow');
-let kittens = api.kittens.get();
+```shell
+$ sudo curl -L https://github.com/docker/compose/releases/download/1.21.2/docker-compose-$(uname -s)-$(uname -m)\
+ -o /usr/local/bin/docker-compose
+$ sudo chmod +x /usr/local/bin/docker-compose
 ```
 
-> The above command returns JSON structured like this:
+> Install Papi:
 
-```json
-[
-  {
-    "id": 1,
-    "name": "Fluffums",
-    "breed": "calico",
-    "fluffiness": 6,
-    "cuteness": 7
-  },
-  {
-    "id": 2,
-    "name": "Max",
-    "breed": "unknown",
-    "fluffiness": 5,
-    "cuteness": 10
-  }
-]
+```shell
+$ git clone https://github.com/PeerAssets/papi
+$ cd papi
+$ sudo service docker start
+$ docker-compose up
 ```
 
-This endpoint retrieves all kittens.
 
 ### HTTP Request
 
-`GET http://example.com/api/kittens`
+* **API:**  
+`GET http://papi.peercoin.net/api/v1/decks`  
+`GET http://papi.peercoin.net/api/v1/decks/<deck_id>`  
+`GET http://papi.peercoin.net/api/v1/decks/<deck_id>/balances`  
+
+* **REST API:**  
+`GET http://papi.peercoin.net/restless/v1/<__tablename__>`
+
+### Table: "decks"  
+
+Parameter | Description | Type
+--------- | ------- | -----------
+id | Deck Transaction ID | String
+name | Deck Name | String
+issuer | Deck Issuer's Address | String
+issue_mode | Deck Issue Mode | Integer
+decimals | Deck Precision | Integer
+subscribed | Server Subscription Status | Boolean
+asset_specific_data | Freeform Data | String
+
+### Table: "cards"  
+
+Parameter | Description | Type
+--------- | ------- | -----------
+txid | Card Transaction ID | String
+blockhash | Blockhash of Card | String
+blocknum | Blocknum of Card | Integer
+blockseq | Transaction Sequence in Block | Integer
+cardseq | Card Sequence in Transaction | Integer
+sender | Card Sender's Address | String
+receiver | Card Receivers Address | String
+amount | Card Amount | BigInteger
+ctype | Card Transaction Type | String
+valid | Validity State | Boolean
+asset_specific_data | Freeform Data | String
+
+### Table: "balances"  
+
+Parameter | Description | Type
+--------- | ------- | -----------
+id | Deck Transaction ID | String
+name | Deck Name | String
+issuer | Deck Issuer's Address | String
+issue_mode | Deck Issue Mode | Integer
+decimals | Deck Precision | Integer
+subscribed | Server Subscription Status | Boolean
+asset_specific_data | Freeform Data | String
+
 
 ### Query Parameters
 
-Parameter | Default | Description
---------- | ------- | -----------
-include_cats | false | If set to true, the result will also include cats.
-available | true | If set to false, the result will include kittens that have already been adopted.
+## Get a Specific Deck
 
-<aside class="success">
-Remember — a happy kitten is an authenticated kitten!
-</aside>
-
-## Get a Specific Kitten
-
-```ruby
-require 'kittn'
-
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-api.kittens.get(2)
-```
-
-```python
-import kittn
-
-api = kittn.authorize('meowmeowmeow')
-api.kittens.get(2)
-```
-
-```shell
-curl "http://example.com/api/kittens/2"
-  -H "Authorization: meowmeowmeow"
-```
-
-```javascript
-const kittn = require('kittn');
-
-let api = kittn.authorize('meowmeowmeow');
-let max = api.kittens.get(2);
-```
 
 > The above command returns JSON structured like this:
 
 ```json
 {
-  "id": 2,
-  "name": "Max",
-  "breed": "unknown",
-  "fluffiness": 5,
-  "cuteness": 10
+  "asset_specific_data": "", 
+  "cards": [
+    {
+      "amount": 5, 
+      "asset_specific_data": "", 
+      "blockhash": "3a5e2fcb6db8ebd5286797dbcbf867de70f0f3d7808c7e41d8b3c994c9e183e7", 
+      "blocknum": 340046, 
+      "blockseq": 2, 
+      "cardseq": 0, 
+      "ctype": "CardIssue", 
+      "deck_id": "d9ffff2db33c855b5092fa756069fce031b2f14d57f5d49541e7a51e025217e8", 
+      "receiver": "mjdW8G6efg1a6PGF1PKcNrs5RTXQFc1aAs", 
+      "sender": "n1ga7fPBerBZDK9NPru39Fanzj9cPhbumM", 
+      "txid": "269ddc3330a883cb3711714b233d5431b1ab1bfb6b740ef07ce3bb053fcdeb7f", 
+      "valid": true
+    }
+  ], 
+  "decimals": 8, 
+  "id": "d9ffff2db33c855b5092fa756069fce031b2f14d57f5d49541e7a51e025217e8", 
+  "issue_mode": 4, 
+  "issuer": "n1ga7fPBerBZDK9NPru39Fanzj9cPhbumM", 
+  "name": "willyBtrippin", 
+  "subscribed": true
 }
 ```
 
-This endpoint retrieves a specific kitten.
+This endpoint retrieves Cards for a specific Deck.
 
-<aside class="warning">Inside HTML code blocks like this one, you can't use Markdown, so use <code>&lt;code&gt;</code> blocks to denote code.</aside>
+<aside class="warning">Testing the warning.</aside>
 
 ### HTTP Request
 
-`GET http://example.com/kittens/<ID>`
+`GET http://papi.peercoin.net/api/v1/<deck_id>`
 
 ### URL Parameters
 
 Parameter | Description
 --------- | -----------
-ID | The ID of the kitten to retrieve
-
-## Delete a Specific Kitten
-
-```ruby
-require 'kittn'
-
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-api.kittens.delete(2)
-```
-
-```python
-import kittn
-
-api = kittn.authorize('meowmeowmeow')
-api.kittens.delete(2)
-```
-
-```shell
-curl "http://example.com/api/kittens/2"
-  -X DELETE
-  -H "Authorization: meowmeowmeow"
-```
-
-```javascript
-const kittn = require('kittn');
-
-let api = kittn.authorize('meowmeowmeow');
-let max = api.kittens.delete(2);
-```
+ID | The ID of the Deck to retrieve
 
 > The above command returns JSON structured like this:
 
@@ -225,15 +283,28 @@ let max = api.kittens.delete(2);
 }
 ```
 
-This endpoint deletes a specific kitten.
+# Pypeerassets
+A python implementaion of the PeerAssets Protocol. Pypeerassets aims to implement the PeerAssets protocol itself and to provide elementary interfaces to underlying blockchains. 
+Requires Python3.5+.
 
-### HTTP Request
+## Installation
+To install pypeerassets you can use `pip install pypeerassets` or directly clone the latest version from the official repository. Click on the shell tab
+on the right and follow the listed commands.
 
-`DELETE http://example.com/kittens/<ID>`
+```shell
+git clone https://github.com/peerassets/pypeerassets
+cd pypeerassets
+python3 setup.py install --user
+```
 
-### URL Parameters
+## Use
+Pypeerassets can be used for direct interation with PeerAssets transactions in the blockchain.  For example, let us look how to list all of the current valid decks
 
-Parameter | Description
---------- | -----------
-ID | The ID of the kitten to delete
+> To use pypeerassets, try this code:
 
+```python
+import pypeerassets as pa
+provider = pa.RpcNode(testnet=True)
+
+pa.find_all_valid_decks( provider, version=1, production=True)
+```
