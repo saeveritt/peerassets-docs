@@ -87,7 +87,7 @@ blockchain and download all relevant transactions. Another reason for creating t
 - A network specific address that designates where all PeerAssets DeckSpawns will be indexed. In the case of Peercoin-Testnet the address is _miHhMLaMWubq4Wx6SdTEqZcUHEGp8RKMZt_.
   
   
-![Alt text](./images/Indexing_Diagram.svg)
+![Alt Diagram](./images/Indexing_Diagram.jpg)
 
 ## Transaction Structure    
 
