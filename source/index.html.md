@@ -85,6 +85,9 @@ blockchain and download all relevant transactions. Another reason for creating t
   
 **_P2TH Directory Address_**
 - A network specific address that designates where all PeerAssets DeckSpawns will be indexed. In the case of Peercoin-Testnet the address is _miHhMLaMWubq4Wx6SdTEqZcUHEGp8RKMZt_.
+  
+  
+![Alt text](./images/Indexing_Diagram.svg)
 
 ## Transaction Structure    
 
@@ -94,9 +97,7 @@ For a DeckSpawn transaction consider the following ,
 - Use of `vout[0]` is strictly for tagging the P2TH Directory Address  
 - Use of `vout[1]` is strictly for OP_RETURN data  
 
-  
-**_Please refer to the code block titled "Example of what vout looks like for a DeckSpawn transaction"_**  
-You will see two vouts, vout[0] and vout[1]. The important parts of vout[0] is the value, which is the P2TH fee, and the receiving address _miHhMLaMWubq4Wx6SdTEqZcUHEGp8RKMZt_, which in this case is the production P2TH directory address for Peercoin-Testnet. 
+**_Please refer to the code block titled "Example of what vout looks like for a DeckSpawn transaction"_**   
 
 > Example what the vouts look like for a DeckSpawn transaction
 
@@ -126,16 +127,14 @@ You will see two vouts, vout[0] and vout[1]. The important parts of vout[0] is t
         },
     ]
 ```
+ 
+You will see two vouts, vout[0] and vout[1]. The important parts of vout[0] are the value, which is the P2TH fee, and the receiving address _miHhMLaMWubq4Wx6SdTEqZcUHEGp8RKMZt_, which in this case is the production P2TH directory address for Peercoin-Testnet. 
+
 Located in vout[1] is a 0 value output that contains an OP_RETURN script. Inside the OP_RETURN field of the example we find the following hexadecimal data:     `0801120677696c6c794218022004`  
   
 Let's take a look at the binary form of this data and parse the information with our protobuf objects.  
 
 **_Please refer to the code block titled "Example of parsing the hexdata into a DeckSpawn object"._**  
-
-To see the result,  
-
-**_Please refer to the code block titled "Parsed from string using the DeckSpawn object in pypeerassets"._**
-
 
 > Example of parsing the hexdata into a DeckSpawn object
 
@@ -148,28 +147,26 @@ Deck = pa.paproto_pb2.DeckSpawn()
 Deck.ParseFromString(op_return)
 Deck
 ```
+This is the result from parsing the OP_RETURN hexadecimal data,  
 
-> Parsed from string using the DeckSpawn object in pypeerassets.
-
-```
-version: 1
-name: "willyB"
-number_of_decimals: 2
+<code>
+version: 1  
+name: "willyB"  
+number_of_decimals: 2  
 issue_mode: 4
-
-```
-
-
+</code>
 
 ### CardTransfer
 For a CardTransfer transaction consider the following ,
 
 - Use of `vout[0]` is strictly for tagging the P2TH Address  
 - Use of `vout[1]` is strictly for OP_RETURN data  
-- 0 Value use of a `vout[n] where n > 1` is to designate the receiver referenced in the amount fields of OP_RETURN data.  
+- Use of `vout[n] where n > 1` is to designate the receiver referenced in the amount fields of OP_RETURN data.  
 
 
-> Example of a Card Transaction's vout:
+**_Please refer to the code block titled "Example what the vouts look like for a CardTransfer transaction"_**   
+
+> Example what the vouts look like for a CardTransfer transaction
 
 ```json
 {
@@ -226,7 +223,7 @@ For a CardTransfer transaction consider the following ,
 }
 ```
 
-> Example of what's inside CardTransfer OP_RETURN
+> Example of parsing CardTransfer Data
 
 ```python
 import pypeerassets as pa
@@ -237,14 +234,16 @@ Card = pa.paproto_pb2.CardTransfer()
 Card.ParseFromString(op_return)
 Card
 ```
-**_Please refer to the code block titled "Example of a Card Transaction's vout"_**  
+
 Lets' take a look at the OP_RETURN data in vout[1].  
+
 `080112178c89f806cba48c03c0921785a1a602a0f8eb02b2ceea011802`  
 
+The result of parsing data using the CardTransfer object in pypeerassets,
 
-> Parsed from string using the CardTransfer object in pypeerassets.
+**_Please refer to the code block titled "Example of parsing CardTransfer Data"_**   
 
-```
+<code>
 version: 1  
 amount: 14550156  
 amount: 6492747  
@@ -253,16 +252,17 @@ amount: 4821125
 amount: 5962784  
 amount: 3843890  
 number_of_decimals: 2
-```
+</code>
 
 The first instance of `amount` in the parsed data will represent the amount being transfered from the sender to the receiver designated in the addresses field of vout[2].
 The second instance of `amount` in the parsed data will represent the amount being transfered to the receiver defined in the addresses field of vout[3] and so
-on. For this example this means that there should be a total of 8 vout's ( though the number has been reduced in the printed example to save space).  
+on. For this example it means that there should be a total of 8 vout's ( though the number has been reduced in the printed example to save space).  
   
 - vout[0] : Pays Fee to P2TH Address
 - vout[1] : 0 Value OP_RETURN Containing Serialized Card Data
-- vout[n..] : 0 Value pubkeyhash sent to receiving address that corresponds to amount[n] located in Serialized Card Data
+- vout[n..] : An output to the receiving address that corresponds to amount[n] located in Serialized Card Data
 
+Following this scheme `_< Receiving Address 1 >_` would receive 14550156 of the `_willyB_` asset whereas < Receiving Address 2 > would receive 6492747.
 
 
 
@@ -270,18 +270,16 @@ on. For this example this means that there should be a total of 8 vout's ( thoug
 ## Decks 
 On the right you can see an example of what a PeerAssets Deck Object looks like. It contains the fields version, name, number_of_decimals, issue_mode, asset_specific_data, and fee.
 
-> An example of a PeerAssets Deck Object,
+An example of a PeerAssets Deck Object,
 
-```
-{
-    "version" : 1,
-    "name" : "My Deck",
-    "number_of_decimals": 8,
-    "issue_mode": 0x04,
-    "asset_specific_data": "",
-    "fee": 0
-  }
-```
+<code>
+{ "version" : 1,  
+    "name" : "My Deck",  
+    "number_of_decimals": 8,  
+    "issue_mode": 0x04,  
+    "asset_specific_data": "",  
+    "fee": 0 }
+</code>
 ### Version
 The `version` field represents the PeerAssets protocol version number used to define this deck.
 
